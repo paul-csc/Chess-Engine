@@ -1,16 +1,61 @@
 #include <iostream>
 #include <algorithm>
 #include <sstream>
-#include <cASSERT>
 #include <string>
 #include <cctype>
-
 #include "board.h"
 #include "types.h"
 
 namespace ChessCpp {
 namespace {
     constexpr std::string_view PieceToChar(" PNBRQK  pnbrqk");
+
+    uint64_t seed = 1804289383ULL;
+    inline uint64_t rand64() {
+        uint64_t x = seed;
+        x ^= x >> 12;
+        x ^= x << 25;
+        x ^= x >> 27;
+        seed = x;
+        return x * 2685821657736338717ULL;
+    }
+}
+
+namespace Zobrist {
+    Key psq[PIECE_NB][SQUARE_NB];
+    Key castling[CASTLING_RIGHT_NB];
+    Key side;
+}  // namespace Zobrist
+
+void Board::init_zobrist() {
+    for (int i = 0; i < PIECE_NB; ++i) {
+        for (Square j = SQ_A1; j < SQUARE_NB; ++j) {
+            Zobrist::psq[i][j] = rand64();
+        }
+    }
+    Zobrist::side = rand64();
+    for (int i = 0; i < CASTLING_RIGHT_NB; ++i) {
+        Zobrist::castling[i] = rand64();
+    }
+}
+
+void Board::generatePosKey() {
+    for (Square i = SQ_A1; i < SQUARE_NB; ++i) {
+        Piece piece = pieces[i];
+        if (piece != NO_PIECE) {
+            posKey ^= Zobrist::psq[piece][i];
+        }
+    }
+
+    if (sideToMove == WHITE) {
+        posKey ^= Zobrist::side;
+    }
+
+    if (epSquare != SQ_NONE) {
+        posKey ^= Zobrist::psq[NO_PIECE][epSquare];
+    }
+
+    posKey ^= Zobrist::castling[castlingRights];
 }
 
 void Board::reset() {
@@ -18,11 +63,13 @@ void Board::reset() {
         pieces[i] = NO_PIECE;
     }
 
+    kingSquare[WHITE] = kingSquare[BLACK] = SQ_NONE;
     sideToMove = WHITE;
     epSquare = SQ_NONE;
     rule50 = 0;
     gamePly = 0;
     castlingRights = NO_CASTLING;
+    posKey = 0ULL;
 }
 
 void Board::set(const std::string& fenStr) {
@@ -43,6 +90,10 @@ void Board::set(const std::string& fenStr) {
             sq += 2 * SOUTH;
         } else if ((idx = PieceToChar.find(token)) != std::string::npos) {
             pieces[sq] = Piece(idx);
+            if (Piece(idx) == W_KING)
+                kingSquare[WHITE] = sq;
+            if (Piece(idx) == B_KING)
+                kingSquare[BLACK] = sq;
             ++sq;
         }
     }
@@ -73,6 +124,8 @@ void Board::set(const std::string& fenStr) {
 
     // Convert from fullmove starting from 1 to internal ply count
     gamePly = std::max(2 * (gamePly - 1), 0) + (sideToMove == BLACK);
+
+    generatePosKey();
 }
 
 void Board::print() const {
@@ -95,16 +148,15 @@ void Board::print() const {
 
     cout << "  a   b   c   d   e   f   g   h\n";
     cout << "Side to move: " << (sideToMove == WHITE ? "w" : "b") << "\n";
-
     cout << "En passant square: ";
     if (is_ok(epSquare))
         cout << epSquare;
     else
         cout << "none";
     cout << "\n";
-
     cout << "Castle permissions: " << (castlingRights & WHITE_OO ? "K" : "-")
          << (castlingRights & WHITE_OOO ? "Q" : "-") << (castlingRights & BLACK_OO ? "k" : "-")
          << (castlingRights & BLACK_OOO ? "q" : "-") << "\n";
+    cout << "Position key: " << posKey << "\n";
 }
 }  // namespace ChessCpp

@@ -16,7 +16,9 @@ class MoveGen {
 
   public:
     MoveGen() = delete;
-    static void generate_all_moves(const Board& board, MoveList& list);
+    static bool is_square_attacked(const Board& board, Square sq, Color attacker);
+    static void generate_pseudo_moves(const Board& board, MoveList& list);
+    static void generate_legal_moves(const Board& board, MoveList& list);
 };
 }  // namespace ChessCpp
 
