@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <cstdlib>
+#include <string>
 #include <cstdint>
 #include <iomanip>
 
@@ -10,7 +11,9 @@ namespace ChessCpp {
 using Bitboard = uint64_t;
 using Key = uint64_t;
 
+const std::string START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 constexpr int MAX_MOVES = 256;
+constexpr int MAX_PLIES = 2048;
 
 // clang-format off
 enum PieceType {

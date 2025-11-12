@@ -2,13 +2,22 @@
 #include <algorithm>
 #include <sstream>
 #include <string>
+#include <chrono>
 #include <cctype>
 #include "board.h"
+#include "movegen.h"
 #include "types.h"
 
 namespace ChessCpp {
+class MoveGen;
+
 namespace {
     constexpr std::string_view PieceToChar(" PNBRQK  pnbrqk");
+    constexpr int CastlePerm[64] = {
+        13, 15, 15, 15, 12, 15, 15, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+        15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+        15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 7,  15, 15, 15, 3,  15, 15, 11,
+    };
 
     uint64_t seed = 1804289383ULL;
     inline uint64_t rand64() {
@@ -20,12 +29,6 @@ namespace {
         return x * 2685821657736338717ULL;
     }
 }
-
-namespace Zobrist {
-    Key psq[PIECE_NB][SQUARE_NB];
-    Key castling[CASTLING_RIGHT_NB];
-    Key side;
-}  // namespace Zobrist
 
 void Board::init_zobrist() {
     for (int i = 0; i < PIECE_NB; ++i) {
@@ -159,4 +162,170 @@ void Board::print() const {
          << (castlingRights & BLACK_OOO ? "q" : "-") << "\n";
     cout << "Position key: " << posKey << "\n";
 }
+
+bool Board::do_move(const Move& move) {
+    const Square from = move.from_sq();
+    const Square to = move.to_sq();
+
+    // save state
+    history[gamePly].posKey = posKey;
+    history[gamePly].rule50 = rule50;
+    history[gamePly].epSquare = epSquare;
+    history[gamePly].castlingRights = castlingRights;
+    history[gamePly].captured = pieces[to];  // normal captures only; en-passant handled separately
+
+    // remove old EP & castling from hash
+    if (epSquare != SQ_NONE)
+        posKey ^= Zobrist::psq[NO_PIECE][epSquare];
+    posKey ^= Zobrist::castling[castlingRights];
+
+    // special move handling
+    if (move.type_of() == EN_PASSANT) {
+        // remove the captured pawn (behind 'to')
+        remove_piece(to + (sideToMove == WHITE ? SOUTH : NORTH));
+        rule50 = 0;  // reset 50-move on capture
+    } else if (move.type_of() == CASTLING) {
+        switch (to) {
+        case SQ_C1: move_piece(SQ_A1, SQ_D1); break;
+        case SQ_C8: move_piece(SQ_A8, SQ_D8); break;
+        case SQ_G1: move_piece(SQ_H1, SQ_F1); break;
+        case SQ_G8: move_piece(SQ_H8, SQ_F8); break;
+        default: ASSERT(false);
+        }
+    }
+
+    // normal capture handling (if a piece sits on 'to')
+    if (pieces[to] != NO_PIECE) {
+        remove_piece(to);
+        rule50 = 0;
+    } else if (move.type_of() != EN_PASSANT) {
+        // only increment rule50 if it wasn't a capture (en-passant already set to 0)
+        rule50++;
+    }
+
+    // move the piece
+    move_piece(from, to);
+
+    // promotion handling
+    if (move.type_of() == PROMOTION) {
+        remove_piece(to);
+        put_piece(make_piece(sideToMove, move.promotion_type()), to);
+    }
+
+    // update king square (if moved)
+    if (type_of(pieces[to]) == KING)
+        kingSquare[sideToMove] = to;
+
+    // new en-passant target (from a double pawn push)
+    epSquare = SQ_NONE;
+    if (type_of(pieces[to]) == PAWN && std::abs(rank_of(from) - rank_of(to)) == 2) {
+        epSquare = from + (sideToMove == WHITE ? NORTH : SOUTH);
+    }
+    if (epSquare != SQ_NONE)
+        posKey ^= Zobrist::psq[NO_PIECE][epSquare];  // add new EP key
+
+    // update castling rights and re-add castling key
+    castlingRights &= CastlePerm[from];
+    castlingRights &= CastlePerm[to];
+    posKey ^= Zobrist::castling[castlingRights];
+
+    // flip side
+    sideToMove = ~sideToMove;
+    posKey ^= Zobrist::side;
+
+    gamePly++;
+
+    if (MoveGen::is_square_attacked(*this, kingSquare[~sideToMove], sideToMove)) {
+        undo_move(move);
+        return false;
+    }
+    return true;
+}
+
+void Board::undo_move(const Move& move) {
+    gamePly--;
+
+    const Square from = move.from_sq();
+    const Square to = move.to_sq();
+
+    sideToMove = ~sideToMove;
+
+    // Undo special moves first where needed
+    if (move.type_of() == EN_PASSANT) {
+        // the captured pawn belongs to the opponent of the mover
+        put_piece(make_piece(~sideToMove, PAWN), to + (sideToMove == WHITE ? SOUTH : NORTH));
+    } else if (move.type_of() == CASTLING) {
+        switch (to) {
+        case SQ_C1: move_piece(SQ_D1, SQ_A1); break;
+        case SQ_C8: move_piece(SQ_D8, SQ_A8); break;
+        case SQ_G1: move_piece(SQ_F1, SQ_H1); break;
+        case SQ_G8: move_piece(SQ_F8, SQ_H8); break;
+        default: ASSERT(false);
+        }
+    }
+
+    move_piece(to, from);
+
+    if (move.type_of() == PROMOTION) {
+        remove_piece(from);
+        put_piece(make_piece(sideToMove, PAWN), from);
+    }
+
+    if (history[gamePly].captured != NO_PIECE) {
+        put_piece(history[gamePly].captured, to);
+    }
+
+    if (type_of(pieces[from]) == KING)
+        kingSquare[sideToMove] = from;
+
+    epSquare = history[gamePly].epSquare;
+    rule50 = history[gamePly].rule50;
+    castlingRights = history[gamePly].castlingRights;
+    posKey = history[gamePly].posKey;
+}
+
+void Board::perft(int depth) {
+    if (depth == 0) {
+        perftLealNodes++;
+        return;
+    }
+    MoveList list;
+    MoveGen::generate_pseudo_moves(*this, list);
+    for (int i = 0; i < list.count; ++i) {
+        if (!do_move(list.moves[i])) {
+            continue;
+        }
+        perft(depth - 1);
+        undo_move(list.moves[i]);
+    }
+}
+
+void Board::perftTest(int depth) {
+    print();
+    std::cout << "Starting perft test to depth " << depth << "\n";
+
+    perftLealNodes = 0;
+    MoveList list;
+
+    using namespace std::chrono;
+    auto start = high_resolution_clock::now();
+
+    MoveGen::generate_pseudo_moves(*this, list);
+    for (int i = 0; i < list.count; ++i) {
+        Move move = list.moves[i];
+        if (!do_move(move)) {
+            continue;
+        }
+        unsigned long long before = perftLealNodes;
+        perft(depth - 1);
+        undo_move(move);
+        std::cout << move << ": " << perftLealNodes - before << "\n";
+    }
+
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<milliseconds>(stop - start).count();
+
+    std::cout << "Total: " << perftLealNodes << " nodes in " << duration << " ms\n";
+}
+
 }  // namespace ChessCpp

@@ -228,7 +228,7 @@ bool MoveGen::is_square_attacked(const Board& board, Square sq, Color attacker) 
 }
 
 void MoveGen::generate_pseudo_moves(const Board& board, MoveList& list) {
-    for (Square sq = SQ_A1; sq < SQ_H8; ++sq) {
+    for (Square sq = SQ_A1; sq < SQUARE_NB; ++sq) {
         Piece piece = board.pieces[sq];
         if (piece == NO_PIECE) {
             continue;
