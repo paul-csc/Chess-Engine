@@ -3,6 +3,7 @@
 
 #include <string>
 #include "types.h"
+#include "bitboard.h"
 
 namespace ChessCpp {
 namespace Zobrist {
@@ -34,6 +35,8 @@ class Board {
     Square pieceList[PIECE_NB][10];
     Square kingSquare[COLOR_NB];
     Color sideToMove;
+    Bitboard byColorBB[COLOR_NB];
+
     Square epSquare;
     int rule50;
     int gamePly;
@@ -45,7 +48,7 @@ class Board {
     static void init_zobrist();
     void generatePosKey();
     void reset();
-    void updateListsMaterial();
+    void updateListsBitboards();
     void set(const std::string& fenStr);
     void print() const;
 
@@ -57,16 +60,24 @@ class Board {
 
 inline void Board::put_piece(Piece piece, Square sq) {
     ASSERT(piece != NO_PIECE);
+    Color color = color_of(piece);
+
     pieces[sq] = piece;
     posKey ^= Zobrist::psq[piece][sq];
     pieceList[piece][pieceNb[piece]++] = sq;
+    set_bit(byColorBB[color], sq);
 }
 
 inline void Board::remove_piece(Square sq) {
     Piece piece = pieces[sq];
+
     ASSERT(piece != NO_PIECE);
+
+    Color color = color_of(piece);
     posKey ^= Zobrist::psq[piece][sq];
     pieces[sq] = NO_PIECE;
+
+    clear_bit(byColorBB[color], sq);
 
     for (int i = 0; i < pieceNb[piece]; ++i) {
         if (pieceList[piece][i] == sq) {
@@ -80,11 +91,14 @@ inline void Board::remove_piece(Square sq) {
 inline void Board::move_piece(Square from, Square to) {
     Piece piece = pieces[from];
     ASSERT(piece != NO_PIECE);
+    Color color = color_of(piece);
 
     posKey ^= Zobrist::psq[piece][from];
     posKey ^= Zobrist::psq[piece][to];
     pieces[from] = NO_PIECE;
     pieces[to] = piece;
+    clear_bit(byColorBB[color], from);
+    set_bit(byColorBB[color], to);
 
     for (int i = 0; i < pieceNb[piece]; ++i) {
         if (pieceList[piece][i] == from) {

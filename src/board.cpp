@@ -69,7 +69,8 @@ void Board::reset() {
     for (int i = 0; i < 13; ++i) {
         pieceNb[i] = 0;
     }
-
+    
+    byColorBB[WHITE] = byColorBB[BLACK] = 0ULL;
     kingSquare[WHITE] = kingSquare[BLACK] = SQ_NONE;
     sideToMove = WHITE;
     epSquare = SQ_NONE;
@@ -79,11 +80,14 @@ void Board::reset() {
     posKey = 0ULL;
 }
 
-void Board::updateListsMaterial() {
+void Board::updateListsBitboards() {
     for (Square sq = SQ_A1; sq < SQUARE_NB; ++sq) {
         Piece piece = pieces[sq];
 
         if (piece != NO_PIECE) {
+            Color color = color_of(piece);
+            
+            set_bit(byColorBB[color], sq);
             pieceList[piece][pieceNb[piece]++] = sq;
         }
     }
@@ -143,7 +147,7 @@ void Board::set(const std::string& fenStr) {
     gamePly = std::max(2 * (gamePly - 1), 0) + (sideToMove == BLACK);
 
     generatePosKey();
-    updateListsMaterial();
+    updateListsBitboards();
 }
 
 void Board::print() const {

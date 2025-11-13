@@ -2,7 +2,7 @@
 #include "types.h"
 #include "board.h"
 #include "movegen.h"
-#include "precomputed_move_data.h"
+#include "bitboard.h"
 
 using namespace ChessCpp;
 
@@ -10,15 +10,15 @@ int main() {
     std::ios::sync_with_stdio(false);
     std::cin.tie(nullptr);
 
-    Precomputed::init();
+    Magics::init();
     Board::init_zobrist();
 
     Board board;
     MoveList list;
 
     board.set(START_FEN);
-    board.perftTest(5);
-    // // board.do_move(Move(SQ_B1, SQ_C3));
+    board.perftTest(6);
+    // board.do_move(Move(SQ_B1, SQ_C3));
     // board.print();
     // MoveGen::generate_pseudo_moves(board, list);
     // std::cout << list;

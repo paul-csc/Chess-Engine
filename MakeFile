@@ -2,7 +2,7 @@
 
 CXX = g++ -std=c++17
 
-SRC = $(wildcard src/*.cpp)
+SRC = src/main.cpp src/board.cpp src/movegen.cpp src/bitboard.cpp
 TARGET = build/chess.exe
 DEBUG_TARGET = build/chess_debug.exe
 

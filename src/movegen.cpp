@@ -1,55 +1,52 @@
 #include <iostream>
 #include "types.h"
 #include "board.h"
-#include "precomputed_move_data.h"
+#include "bitboard.h"
 #include "movegen.h"
 
 namespace ChessCpp {
-namespace {
-    constexpr Direction DirectionOffsets[8] = {NORTH,      SOUTH,      WEST,       EAST,
-                                               NORTH_WEST, SOUTH_EAST, NORTH_EAST, SOUTH_WEST};
-    constexpr int PawnAttackDirs[2][2] = {
-        {4, 6},
-        {5, 7}
+void MoveGen::generate_sliding_moves(const Board& board, MoveList& list) {
+    const Color side = board.sideToMove;
+
+    static constexpr Piece pieceIdx[2][3] = {
+        {W_BISHOP, W_ROOK, W_QUEEN},
+        {B_BISHOP, B_ROOK, B_QUEEN}
     };
-}
 
-void MoveGen::generate_sliding_moves(const Board& board, Square startSq, MoveList& list) {
-    const Piece piece = board.pieces[startSq];
-    const int startDirIdx = (type_of(piece) == BISHOP ? 4 : 0);
-    const int endDirIdx = (type_of(piece) == ROOK ? 4 : 8);
+    for (int i = 0; i < 3; i++) {
+        for (int pieceNum = 0; pieceNum < board.pieceNb[pieceIdx[side][i]]; ++pieceNum) {
+            Square startSq = board.pieceList[pieceIdx[side][i]][pieceNum];
 
-    for (int dirIdx = startDirIdx; dirIdx < endDirIdx; ++dirIdx) {
-        for (int n = 0; n < Precomputed::NumSquaresToEdge[startSq][dirIdx]; n++) {
-            Square targetSq = startSq + (n + 1) * DirectionOffsets[dirIdx];
-            Piece targetPiece = board.pieces[targetSq];
-            ASSERT(is_ok(targetSq));
+            Bitboard attacks = 0ULL;
+            Bitboard occupancy = board.byColorBB[WHITE] | board.byColorBB[BLACK];
 
-            if (targetPiece != NO_PIECE && color_of(targetPiece) == color_of(piece)) {
-                break;
+            if (i == 0) {
+                attacks = Magics::getBishopAttacks(startSq, occupancy);
+            } else if (i == 1) {
+                attacks = Magics::getRookAttacks(startSq, occupancy);
+            } else if (i == 2) {
+                attacks = Magics::getBishopAttacks(startSq, occupancy)
+                        | Magics::getRookAttacks(startSq, occupancy);
             }
-            list.moves[list.count++] = Move(startSq, targetSq);
-            if (targetPiece != NO_PIECE && color_of(targetPiece) == ~color_of(piece)) {
-                break;
+
+            attacks &= ~board.byColorBB[side];
+
+            while (attacks) {
+                Square targetSq = pop_lsb(attacks);
+                list.moves[list.count++] = Move(startSq, targetSq);
             }
         }
     }
 }
 
-void MoveGen::generate_king_moves(const Board& board, Square startSq, MoveList& list) {
-    const Piece piece = board.pieces[startSq];
-    const Color color = color_of(piece);
+void MoveGen::generate_king_moves(const Board& board, MoveList& list) {
+    const Color color = board.sideToMove;
+    Square startSq = board.kingSquare[color];
 
-    for (int dirIdx = 0; dirIdx < 8; ++dirIdx) {
-        if (Precomputed::NumSquaresToEdge[startSq][dirIdx] > 0) {
-            Square targetSq = startSq + DirectionOffsets[dirIdx];
-            Piece targetPiece = board.pieces[targetSq];
-            ASSERT(is_ok(targetSq));
-
-            if (targetPiece == NO_PIECE || color_of(targetPiece) != color) {
-                list.moves[list.count++] = Move(startSq, targetSq);
-            }
-        }
+    Bitboard attacks = Precomputed::KingAttacks[startSq] & ~board.byColorBB[color];
+    while (attacks) {
+        Square targetSq = pop_lsb(attacks);
+        list.moves[list.count++] = Move(startSq, targetSq);
     }
 
     // castling
@@ -94,155 +91,113 @@ void MoveGen::generate_king_moves(const Board& board, Square startSq, MoveList& 
     }
 }
 
-void MoveGen::generate_knight_moves(const Board& board, Square startSq, MoveList& list) {
-    for (int knightMoveIdx = 0; knightMoveIdx < 8; ++knightMoveIdx) {
-        Square targetSq = Precomputed::KnightMoves[startSq][knightMoveIdx];
+void MoveGen::generate_knight_moves(const Board& board, MoveList& list) {
+    const Color color = board.sideToMove;
 
-        if (targetSq == SQ_NONE)
-            continue;
+    for (int pieceNum = 0; pieceNum < board.pieceNb[make_piece(color, KNIGHT)]; ++pieceNum) {
+        Square startSq = board.pieceList[make_piece(color, KNIGHT)][pieceNum];
+        Bitboard attacks = Precomputed::KnightAttacks[startSq] & ~board.byColorBB[color];
 
-        Piece targetPiece = board.pieces[targetSq];
-        if (targetPiece == NO_PIECE || color_of(targetPiece) != board.sideToMove) {
+        while (attacks) {
+            Square targetSq = pop_lsb(attacks);
             list.moves[list.count++] = Move(startSq, targetSq);
         }
     }
 }
 
-void MoveGen::generate_pawn_moves(const Board& board, Square startSq, MoveList& list) {
-    const Piece piece = board.pieces[startSq];
-    const Color color = color_of(piece);
-    const Rank rank = rank_of(startSq);
+void MoveGen::generate_pawn_moves(const Board& board, MoveList& list) {
+    const Color color = board.sideToMove;
     const Rank startRank = relative_rank(color, RANK_2);
     const Rank promoRank = relative_rank(color, RANK_7);
-    const Square oneForward = startSq + pawn_push(color);
-    const Square twoForward = startSq + 2 * pawn_push(color);
 
-    // pushes
-    if (board.pieces[oneForward] == NO_PIECE) {
-        if (rank == promoRank) {
-            list.moves[list.count++] = Move::make<PROMOTION>(startSq, oneForward, KNIGHT);
-            list.moves[list.count++] = Move::make<PROMOTION>(startSq, oneForward, BISHOP);
-            list.moves[list.count++] = Move::make<PROMOTION>(startSq, oneForward, ROOK);
-            list.moves[list.count++] = Move::make<PROMOTION>(startSq, oneForward, QUEEN);
-        } else {
-            list.moves[list.count++] = Move(startSq, oneForward);
-            if (rank == startRank && board.pieces[twoForward] == NO_PIECE) {
-                list.moves[list.count++] = Move(startSq, twoForward);
-            }
-        }
-    }
+    for (int pieceIdx = 0; pieceIdx < board.pieceNb[make_piece(color, PAWN)]; pieceIdx++) {
+        const Square startSq = board.pieceList[make_piece(color, PAWN)][pieceIdx];
+        const Rank rank = rank_of(startSq);
+        const Square oneForward = startSq + pawn_push(color);
+        ASSERT(is_ok(oneForward));
+        // pushes
+        if (board.pieces[oneForward] == NO_PIECE) {
+            if (rank == promoRank) {
+                list.moves[list.count++] = Move::make<PROMOTION>(startSq, oneForward, KNIGHT);
+                list.moves[list.count++] = Move::make<PROMOTION>(startSq, oneForward, BISHOP);
+                list.moves[list.count++] = Move::make<PROMOTION>(startSq, oneForward, ROOK);
+                list.moves[list.count++] = Move::make<PROMOTION>(startSq, oneForward, QUEEN);
+            } else {
+                const Square twoForward = startSq + 2 * pawn_push(color);
+                ASSERT(is_ok(twoForward));
 
-    // captures
-    for (int j = 0; j < 2; ++j) {
-        if (Precomputed::NumSquaresToEdge[startSq][PawnAttackDirs[color][j]] > 0) {
-            Square targetSq = startSq + DirectionOffsets[PawnAttackDirs[color][j]];
-            Piece targetPiece = board.pieces[targetSq];
-
-            if (targetPiece != NO_PIECE && color_of(targetPiece) == ~color) {
-                if (rank == promoRank) {
-                    list.moves[list.count++] = Move::make<PROMOTION>(startSq, targetSq, KNIGHT);
-                    list.moves[list.count++] = Move::make<PROMOTION>(startSq, targetSq, BISHOP);
-                    list.moves[list.count++] = Move::make<PROMOTION>(startSq, targetSq, ROOK);
-                    list.moves[list.count++] = Move::make<PROMOTION>(startSq, targetSq, QUEEN);
-                } else {
-                    list.moves[list.count++] = Move(startSq, targetSq);
+                list.moves[list.count++] = Move(startSq, oneForward);
+                if (rank == startRank && board.pieces[twoForward] == NO_PIECE) {
+                    list.moves[list.count++] = Move(startSq, twoForward);
                 }
             }
+        }
 
-            // en passant
-            if (targetSq == board.epSquare) {
-                list.moves[list.count++] = Move::make<EN_PASSANT>(startSq, targetSq);
+        // captures
+        Bitboard attacks = Precomputed::PawnAttacks[color][startSq] & board.byColorBB[~color];
+        while (attacks) {
+            Square to = pop_lsb(attacks);
+            if (rank == promoRank) {
+                list.moves[list.count++] = Move::make<PROMOTION>(startSq, to, KNIGHT);
+                list.moves[list.count++] = Move::make<PROMOTION>(startSq, to, BISHOP);
+                list.moves[list.count++] = Move::make<PROMOTION>(startSq, to, ROOK);
+                list.moves[list.count++] = Move::make<PROMOTION>(startSq, to, QUEEN);
+            } else {
+                list.moves[list.count++] = Move(startSq, to);
             }
+        }
+
+        // en passant
+        if (board.epSquare != SQ_NONE
+            && (Precomputed::PawnAttacks[color][startSq] & (1ULL << board.epSquare))) {
+            list.moves[list.count++] = Move::make<EN_PASSANT>(startSq, board.epSquare);
         }
     }
 }
 
 bool MoveGen::is_square_attacked(const Board& board, Square sq, Color attacker) {
-    // pawns
-    for (int j = 0; j < 2; ++j) {
-        // look from the opposite pawn attack direction
-        Direction dir = Direction(PawnAttackDirs[~attacker][j]);
-        if (Precomputed::NumSquaresToEdge[sq][dir] > 0) {
-            if (board.pieces[sq + DirectionOffsets[dir]] == make_piece(attacker, PAWN)) {
-                return true;
-            }
-        }
-    }
+    Bitboard sqBb = square_bb(sq);
 
-    // kings
-    for (int dirIdx = 0; dirIdx < 8; ++dirIdx) {
-        if (Precomputed::NumSquaresToEdge[sq][dirIdx] > 0) {
-            Square targetSq = sq + DirectionOffsets[dirIdx];
-            ASSERT(is_ok(targetSq));
-            Piece attackerPiece = board.pieces[targetSq];
-
-            if (attackerPiece == make_piece(attacker, KING)) {
-                return true;
-            }
-        }
-    }
-
-    // knights
-    for (int knightMoveIdx = 0; knightMoveIdx < 8; ++knightMoveIdx) {
-        Square targetSq = Precomputed::KnightMoves[sq][knightMoveIdx];
-
-        if (targetSq != SQ_NONE && board.pieces[targetSq] == make_piece(attacker, KNIGHT)) {
+    for (int i = 0; i < board.pieceNb[make_piece(attacker, PAWN)]; ++i) {
+        if (Precomputed::PawnAttacks[attacker][board.pieceList[make_piece(attacker, PAWN)][i]]
+            & sqBb)
             return true;
-        }
     }
 
-    // rooks, queens
-    for (int dirIdx = 0; dirIdx < 4; dirIdx++) {
-        for (int n = 0; n < Precomputed::NumSquaresToEdge[sq][dirIdx]; n++) {
-            Square targetSq = sq + (n + 1) * DirectionOffsets[dirIdx];
-            ASSERT(is_ok(targetSq));
-            Piece targetPiece = board.pieces[targetSq];
-
-            if (targetPiece == make_piece(attacker, ROOK)
-                || targetPiece == make_piece(attacker, QUEEN)) {
-                return true;
-            } else if (targetPiece != NO_PIECE) {
-                break;
-            }
-        }
+    for (int i = 0; i < board.pieceNb[make_piece(attacker, KNIGHT)]; ++i) {
+        if (Precomputed::KnightAttacks[board.pieceList[make_piece(attacker, KNIGHT)][i]] & sqBb)
+            return true;
     }
 
-    // bishop, queens
-    for (int dirIdx = 4; dirIdx < 8; dirIdx++) {
-        for (int n = 0; n < Precomputed::NumSquaresToEdge[sq][dirIdx]; n++) {
-            Square targetSq = sq + (n + 1) * DirectionOffsets[dirIdx];
-            ASSERT(is_ok(targetSq));
-            Piece targetPiece = board.pieces[targetSq];
-
-            if (targetPiece == make_piece(attacker, BISHOP)
-                || targetPiece == make_piece(attacker, QUEEN)) {
-                return true;
-            } else if (targetPiece != NO_PIECE) {
-                break;
-            }
-        }
+    if (Precomputed::KingAttacks[board.kingSquare[attacker]] & sqBb) {
+        return true;
     }
 
+    Bitboard occupied = board.byColorBB[WHITE] | board.byColorBB[BLACK];
+    for (int i = 0; i < board.pieceNb[BISHOP + attacker * 8]; ++i) {
+        if (Magics::getBishopAttacks(board.pieceList[BISHOP + attacker * 8][i], occupied) & sqBb)
+            return true;
+    }
+
+    for (int i = 0; i < board.pieceNb[ROOK + attacker * 8]; ++i) {
+        if (Magics::getRookAttacks(board.pieceList[ROOK + attacker * 8][i], occupied) & sqBb)
+            return true;
+    }
+
+    for (int i = 0; i < board.pieceNb[QUEEN + attacker * 8]; ++i) {
+        if ((Magics::getRookAttacks(board.pieceList[QUEEN + attacker * 8][i], occupied)
+             | Magics::getBishopAttacks(board.pieceList[QUEEN + attacker * 8][i], occupied))
+            & sqBb)
+            return true;
+    }
     return false;
 }
 
 void MoveGen::generate_pseudo_moves(const Board& board, MoveList& list) {
-    const Color color = board.sideToMove;
-    for (PieceType i = BISHOP; i <= QUEEN; ++i) {
-        for (int pieceIdx = 0; pieceIdx < board.pieceNb[make_piece(color, i)]; pieceIdx++) {
-            generate_sliding_moves(board, board.pieceList[make_piece(color, i)][pieceIdx], list);
-        }
-    }
-
-    for (int pieceIdx = 0; pieceIdx < board.pieceNb[make_piece(color, KNIGHT)]; pieceIdx++) {
-        generate_knight_moves(board, board.pieceList[make_piece(color, KNIGHT)][pieceIdx], list);
-    }
-
-    for (int pieceIdx = 0; pieceIdx < board.pieceNb[make_piece(color, PAWN)]; pieceIdx++) {
-        generate_pawn_moves(board, board.pieceList[make_piece(color, PAWN)][pieceIdx], list);
-    }
-
-    generate_king_moves(board, board.kingSquare[color], list);
+    generate_pawn_moves(board, list);
+    generate_sliding_moves(board, list);
+    generate_knight_moves(board, list);
+    generate_king_moves(board, list);
 }
 
 void MoveGen::generate_legal_moves(const Board& board, MoveList& list) {
