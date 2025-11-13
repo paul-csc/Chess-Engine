@@ -30,6 +30,8 @@ class Board {
 
   public:
     Piece pieces[SQUARE_NB];
+    int pieceNb[PIECE_NB];
+    Square pieceList[PIECE_NB][10];
     Square kingSquare[COLOR_NB];
     Color sideToMove;
     Square epSquare;
@@ -43,6 +45,7 @@ class Board {
     static void init_zobrist();
     void generatePosKey();
     void reset();
+    void updateListsMaterial();
     void set(const std::string& fenStr);
     void print() const;
 
@@ -56,6 +59,7 @@ inline void Board::put_piece(Piece piece, Square sq) {
     ASSERT(piece != NO_PIECE);
     pieces[sq] = piece;
     posKey ^= Zobrist::psq[piece][sq];
+    pieceList[piece][pieceNb[piece]++] = sq;
 }
 
 inline void Board::remove_piece(Square sq) {
@@ -63,15 +67,32 @@ inline void Board::remove_piece(Square sq) {
     ASSERT(piece != NO_PIECE);
     posKey ^= Zobrist::psq[piece][sq];
     pieces[sq] = NO_PIECE;
+
+    for (int i = 0; i < pieceNb[piece]; ++i) {
+        if (pieceList[piece][i] == sq) {
+            pieceList[piece][i] = pieceList[piece][--pieceNb[piece]];
+            return;
+        }
+    }
+    ASSERT(false);
 }
 
 inline void Board::move_piece(Square from, Square to) {
     Piece piece = pieces[from];
-    if (piece == NO_PIECE)
-        ASSERT(piece != NO_PIECE);
+    ASSERT(piece != NO_PIECE);
 
-    remove_piece(from);
-    put_piece(piece, to);
+    posKey ^= Zobrist::psq[piece][from];
+    posKey ^= Zobrist::psq[piece][to];
+    pieces[from] = NO_PIECE;
+    pieces[to] = piece;
+
+    for (int i = 0; i < pieceNb[piece]; ++i) {
+        if (pieceList[piece][i] == from) {
+            pieceList[piece][i] = to;
+            return;
+        }
+    }
+    ASSERT(false);
 }
 }  // namespace ChessCpp
 

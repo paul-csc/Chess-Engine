@@ -87,7 +87,7 @@ ENABLE_INCR_OPERATORS_ON(Rank)
 
 #undef ENABLE_INCR_OPERATORS_ON
 
-#ifdef DEBUG
+#ifdef _DEBUG
     #define ASSERT(n)                                                                      \
         do {                                                                               \
             if (!(n)) {                                                                    \

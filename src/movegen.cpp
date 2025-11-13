@@ -46,8 +46,7 @@ void MoveGen::generate_king_moves(const Board& board, Square startSq, MoveList& 
             Piece targetPiece = board.pieces[targetSq];
             ASSERT(is_ok(targetSq));
 
-            if (targetPiece == NO_PIECE
-                || color_of(targetPiece) != color) {
+            if (targetPiece == NO_PIECE || color_of(targetPiece) != color) {
                 list.moves[list.count++] = Move(startSq, targetSq);
             }
         }
@@ -228,26 +227,22 @@ bool MoveGen::is_square_attacked(const Board& board, Square sq, Color attacker) 
 }
 
 void MoveGen::generate_pseudo_moves(const Board& board, MoveList& list) {
-    for (Square sq = SQ_A1; sq < SQUARE_NB; ++sq) {
-        Piece piece = board.pieces[sq];
-        if (piece == NO_PIECE) {
-            continue;
-        }
-        if (color_of(piece) == board.sideToMove) {
-            PieceType type = type_of(piece);
-            if (type == ROOK || type == BISHOP || type == QUEEN) {
-                generate_sliding_moves(board, sq, list);
-            } else if (type == KING) {
-                generate_king_moves(board, sq, list);
-            } else if (type == KNIGHT) {
-                generate_knight_moves(board, sq, list);
-            } else if (type == PAWN) {
-                generate_pawn_moves(board, sq, list);
-            } else {
-                ASSERT(false);
-            }
+    const Color color = board.sideToMove;
+    for (PieceType i = BISHOP; i <= QUEEN; ++i) {
+        for (int pieceIdx = 0; pieceIdx < board.pieceNb[make_piece(color, i)]; pieceIdx++) {
+            generate_sliding_moves(board, board.pieceList[make_piece(color, i)][pieceIdx], list);
         }
     }
+
+    for (int pieceIdx = 0; pieceIdx < board.pieceNb[make_piece(color, KNIGHT)]; pieceIdx++) {
+        generate_knight_moves(board, board.pieceList[make_piece(color, KNIGHT)][pieceIdx], list);
+    }
+
+    for (int pieceIdx = 0; pieceIdx < board.pieceNb[make_piece(color, PAWN)]; pieceIdx++) {
+        generate_pawn_moves(board, board.pieceList[make_piece(color, PAWN)][pieceIdx], list);
+    }
+
+    generate_king_moves(board, board.kingSquare[color], list);
 }
 
 void MoveGen::generate_legal_moves(const Board& board, MoveList& list) {

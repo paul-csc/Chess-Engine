@@ -66,6 +66,10 @@ void Board::reset() {
         pieces[i] = NO_PIECE;
     }
 
+    for (int i = 0; i < 13; ++i) {
+        pieceNb[i] = 0;
+    }
+
     kingSquare[WHITE] = kingSquare[BLACK] = SQ_NONE;
     sideToMove = WHITE;
     epSquare = SQ_NONE;
@@ -73,6 +77,16 @@ void Board::reset() {
     gamePly = 0;
     castlingRights = NO_CASTLING;
     posKey = 0ULL;
+}
+
+void Board::updateListsMaterial() {
+    for (Square sq = SQ_A1; sq < SQUARE_NB; ++sq) {
+        Piece piece = pieces[sq];
+
+        if (piece != NO_PIECE) {
+            pieceList[piece][pieceNb[piece]++] = sq;
+        }
+    }
 }
 
 void Board::set(const std::string& fenStr) {
@@ -129,6 +143,7 @@ void Board::set(const std::string& fenStr) {
     gamePly = std::max(2 * (gamePly - 1), 0) + (sideToMove == BLACK);
 
     generatePosKey();
+    updateListsMaterial();
 }
 
 void Board::print() const {
@@ -319,13 +334,12 @@ void Board::perftTest(int depth) {
         unsigned long long before = perftLealNodes;
         perft(depth - 1);
         undo_move(move);
-        std::cout << move << ": " << perftLealNodes - before << "\n";
+        std::cout << move << ": " << perftLealNodes - before << std::endl;
     }
 
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<milliseconds>(stop - start).count();
 
-    std::cout << "Total: " << perftLealNodes << " nodes in " << duration << " ms\n";
+    std::cout << "Total: " << perftLealNodes << " nodes in " << duration << " ms" << std::endl;
 }
-
 }  // namespace ChessCpp
