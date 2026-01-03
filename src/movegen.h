@@ -1,28 +1,22 @@
-#ifndef MOVEGEN_H
-#define MOVEGEN_H
+#pragma once
 
 #include "types.h"
 
-namespace ChessCpp {
+namespace Zugzwang {
 class Board;
 
-// static class
 class MoveGen {
-  private:
-    template<PieceType type>
-    static void generate_piece_moves(const Board& board, MoveList& list);
-    static void generate_sliding_moves(const Board& board, MoveList& list);
-    static void generate_king_moves(const Board& board, MoveList& list);
-    static void generate_knight_moves(const Board& board, MoveList& list);
-    static void generate_pawn_moves(const Board& board, MoveList& list);
-
   public:
-    MoveGen() = delete;
-    static bool is_square_attacked(const Board& board, Square sq, Color attacker);
-    static bool is_move_legal(Board& board, const Move move);
-    static void generate_pseudo_moves(const Board& board, MoveList& list);
-    static void generate_legal_moves(const Board& board, MoveList& list);
-};
-}  // namespace ChessCpp
+    static bool IsSquareAttacked(const Board& board, Square sq, Color attacker);
+    static bool ISMoveLegal(Board& board, const Move move);
+    static void GeneratePseudoMoves(const Board& board, MoveList& list);
 
-#endif  // MOVEGEN_H
+  private:
+    MoveGen() {}
+
+    static void GenerateSlidingMoves(const Board& board, MoveList& list);
+    static void GenerateKingMoves(const Board& board, MoveList& list);
+    static void GenerateKnightMoves(const Board& board, MoveList& list);
+    static void GeneratePawnMoves(const Board& board, MoveList& list);
+};
+} // namespace Zugzwang

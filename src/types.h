@@ -1,20 +1,18 @@
-#ifndef TYPES_H
-#define TYPES_H
+#pragma once
 
-#include <iostream>
-#include <cstdlib>
 #include <cstdint>
+#include <cstdlib>
 #include <iomanip>
+#include <iostream>
 
-namespace ChessCpp {
+namespace Zugzwang {
+
 using Bitboard = uint64_t;
 using Key = uint64_t;
 
-constexpr auto START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+constexpr const char* START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 constexpr int MAX_MOVES = 256;
 constexpr int MAX_PLIES = 2048;
-constexpr int INFINITY = 30000;
-constexpr int MAX_DEPTH = 64;
 
 // clang-format off
 enum PieceType : int8_t {
@@ -22,8 +20,6 @@ enum PieceType : int8_t {
     ALL_PIECES = 0,
     PIECE_TYPE_NB = 8
 };
-
-constexpr int PieceValues[PIECE_TYPE_NB] = {0, 100, 300, 300, 500, 900, 0};
 
 enum Piece : int8_t {
     NO_PIECE,
@@ -75,13 +71,17 @@ enum Direction : int {
     NORTH_WEST = NORTH + WEST
 };
 
-enum File : int8_t  { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H, FILE_NB };
+enum File : int8_t { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H, FILE_NB };
 
-enum Rank : int8_t  { RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8, RANK_NB };
+enum Rank : int8_t { RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8, RANK_NB };
 
-#define ENABLE_INCR_OPERATORS_ON(T)                          \
-    inline T& operator++(T& d) { return d = T(int(d) + 1); } \
-    inline T& operator--(T& d) { return d = T(int(d) - 1); }
+#define ENABLE_INCR_OPERATORS_ON(T) \
+    inline T& operator++(T& d) {    \
+        return d = T(int(d) + 1);   \
+    }                               \
+    inline T& operator--(T& d) {    \
+        return d = T(int(d) - 1);   \
+    }
 
 ENABLE_INCR_OPERATORS_ON(PieceType)
 ENABLE_INCR_OPERATORS_ON(Square)
@@ -91,62 +91,92 @@ ENABLE_INCR_OPERATORS_ON(Rank)
 #undef ENABLE_INCR_OPERATORS_ON
 
 #ifdef DEBUG
-    #define ASSERT(n)                                                                      \
-        do {                                                                               \
-            if (!(n)) {                                                                    \
-                std::cout << "Assertion failed: " << #n << "\n";                           \
-                std::cout << "In file: " << __FILE__ << ", at line: " << __LINE__ << "\n"; \
-                std::cin.get();                                                            \
-                std::exit(1);                                                              \
-            }                                                                              \
-        } while (0)
+#define ASSERT(n)                                                                      \
+    do {                                                                               \
+        if (!(n)) {                                                                    \
+            std::cout << "Assertion failed: " << #n << "\n";                           \
+            std::cout << "In file: " << __FILE__ << ", at line: " << __LINE__ << "\n"; \
+            std::cin.get();                                                            \
+            std::exit(1);                                                              \
+        }                                                                              \
+    } while (0)
 #else
-    #define ASSERT(n) ((void) 0)
+#define ASSERT(n) ((void)0)
 #endif
 
-constexpr Direction operator+(Direction d1, Direction d2) { return Direction(int(d1) + int(d2)); }
-constexpr Direction operator*(int i, Direction d) { return Direction(i * int(d)); }
-
-// Additional operators to add a Direction to a Square
-constexpr Square operator+(Square s, Direction d) { return Square(int(s) + int(d)); }
-constexpr Square operator-(Square s, Direction d) { return Square(int(s) - int(d)); }
-inline Square& operator+=(Square& s, Direction d) { return s = s + d; }
-inline Square& operator-=(Square& s, Direction d) { return s = s - d; }
-
-// Toggle color
-constexpr Color operator~(Color c) { return Color(c ^ BLACK); }
-
-constexpr CastlingRights operator&(Color c, CastlingRights cr) {
-    return CastlingRights((c == WHITE ? WHITE_CASTLING : BLACK_CASTLING) & cr);
+constexpr Direction operator+(Direction d1, Direction d2) {
+    return Direction(int(d1) + int(d2));
+}
+constexpr Direction operator*(int i, Direction d) {
+    return Direction(i * int(d));
 }
 
-constexpr Square make_square(File f, Rank r) { return Square((r << 3) + f); }
+// Additional operators to add a Direction to a Square
+constexpr Square operator+(Square s, Direction d) {
+    return Square(int(s) + int(d));
+}
+constexpr Square operator-(Square s, Direction d) {
+    return Square(int(s) - int(d));
+}
+inline Square& operator+=(Square& s, Direction d) {
+    return s = s + d;
+}
+inline Square& operator-=(Square& s, Direction d) {
+    return s = s - d;
+}
 
-constexpr Piece make_piece(Color c, PieceType pt) { return Piece((c << 3) + pt); }
+// Toggle color
+constexpr Color operator~(Color c) {
+    return Color(c ^ BLACK);
+}
 
-constexpr PieceType type_of(Piece pc) { return PieceType(pc & 7); }
+constexpr Square MakeSquare(File f, Rank r) {
+    return Square((r << 3) + f);
+}
 
-inline Color color_of(Piece pc) {
+constexpr Piece MakePiece(Color c, PieceType pt) {
+    return Piece((c << 3) + pt);
+}
+
+constexpr PieceType TypeOf(Piece pc) {
+    return PieceType(pc & 7);
+}
+
+inline Color ColorOf(Piece pc) {
     ASSERT(pc != NO_PIECE);
     return Color(pc >> 3);
 }
 
-constexpr bool is_ok(Square s) { return s >= SQ_A1 && s <= SQ_H8; }
+constexpr bool IsOk(Square s) {
+    return s >= SQ_A1 && s <= SQ_H8;
+}
 
-constexpr File file_of(Square s) { return File(s & 7); }
+constexpr File FileOf(Square s) {
+    return File(s & 7);
+}
 
-constexpr Rank rank_of(Square s) { return Rank(s >> 3); }
+constexpr Rank RankOf(Square s) {
+    return Rank(s >> 3);
+}
 
-constexpr Square relative_square(Color c, Square s) { return Square(s ^ (c * 56)); }
+constexpr Square RelativeSquare(Color c, Square s) {
+    return Square(s ^ (c * 56));
+}
 
-constexpr Rank relative_rank(Color c, Rank r) { return Rank(r ^ (c * 7)); }
+constexpr Rank RelativeRank(Color c, Rank r) {
+    return Rank(r ^ (c * 7));
+}
 
-constexpr Rank relative_rank(Color c, Square s) { return relative_rank(c, rank_of(s)); }
+constexpr Rank RelativeRank(Color c, Square s) {
+    return RelativeRank(c, RankOf(s));
+}
 
-constexpr Direction pawn_push(Color c) { return c == WHITE ? NORTH : SOUTH; }
+constexpr Direction PawnPush(Color c) {
+    return c == WHITE ? NORTH : SOUTH;
+}
 
 inline std::ostream& operator<<(std::ostream& os, const Square& sq) {
-    os << char('a' + file_of(sq)) << char('1' + rank_of(sq));
+    os << char('a' + FileOf(sq)) << char('1' + RankOf(sq));
     return os;
 }
 
@@ -162,42 +192,38 @@ class Move {
 
   public:
     Move() = default;
-    constexpr explicit Move(uint16_t d)
-        : data(d) { }
+    constexpr explicit Move(uint16_t d) : data(d) {}
 
-    constexpr Move(Square from, Square to)
-        : data((from << 6) + to) { }
+    constexpr Move(Square from, Square to) : data((from << 6) + to) {}
 
-    template<MoveType T>
-    static constexpr Move make(Square from, Square to, PieceType pt = KNIGHT) {
+    template <MoveType T>
+    static constexpr Move Make(Square from, Square to, PieceType pt = KNIGHT) {
         return Move(T + ((pt - KNIGHT) << 12) + (from << 6) + to);
     }
 
-    static constexpr Move none() { return Move(0); }
+    static constexpr Move None() { return Move(0); }
 
-    constexpr Square from_sq() const { return Square((data >> 6) & 0x3F); }
+    constexpr Square FromSq() const { return Square((data >> 6) & 0x3F); }
 
-    constexpr Square to_sq() const { return Square(data & 0x3F); }
+    constexpr Square ToSq() const { return Square(data & 0x3F); }
 
-    constexpr MoveType type_of() const { return MoveType(data & (3 << 14)); }
+    constexpr MoveType TypeOf() const { return MoveType(data & (3 << 14)); }
 
-    constexpr PieceType promotion_type() const { return PieceType(((data >> 12) & 3) + KNIGHT); }
+    constexpr PieceType PromotionType() const { return PieceType(((data >> 12) & 3) + KNIGHT); }
 
     constexpr bool operator==(const Move& m) const { return data == m.data; }
     constexpr bool operator!=(const Move& m) const { return data != m.data; }
 
-    constexpr uint16_t raw() const { return data; }
+    friend std::ostream& operator<<(std::ostream& os, const Move& move) {
+        os << move.FromSq() << move.ToSq();
 
-    inline friend std::ostream& operator<<(std::ostream& os, const Move& move) {
-        os << move.from_sq() << move.to_sq();
-
-        if (move.type_of() == PROMOTION) {
+        if (move.TypeOf() == PROMOTION) {
             char promoCh;
-            switch (move.promotion_type()) {
-            case KNIGHT: promoCh = 'n'; break;
-            case ROOK: promoCh = 'r'; break;
-            case BISHOP: promoCh = 'b'; break;
-            default: promoCh = 'q'; break;
+            switch (move.PromotionType()) {
+                case KNIGHT: promoCh = 'n'; break;
+                case ROOK: promoCh = 'r'; break;
+                case BISHOP: promoCh = 'b'; break;
+                default: promoCh = 'q'; break;
             }
             os << promoCh;
         }
@@ -207,17 +233,16 @@ class Move {
 };
 
 struct MoveList {
-    Move moves[MAX_MOVES];
-    int count = 0;
+    Move Moves[MAX_MOVES];
+    int Count = 0;
 
-    friend inline std::ostream& operator<<(std::ostream& os, const MoveList& list) {
-        for (int i = 0; i < list.count; ++i) {
-            os << std::setw(2) << i + 1 << ": " << list.moves[i] << "\n";
+    friend std::ostream& operator<<(std::ostream& os, const MoveList& list) {
+        for (int i = 0; i < list.Count; ++i) {
+            os << std::setw(2) << i + 1 << ": " << list.Moves[i] << "\n";
         }
-        os << "Total: " << list.count << " moves.\n";
+        os << "Total: " << list.Count << " moves.\n";
         return os;
     }
 };
-}  // namespace ChessCpp
 
-#endif  // TYPES_H
+} // namespace Zugzwang

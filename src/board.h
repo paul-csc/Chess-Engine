@@ -1,132 +1,71 @@
-#ifndef BOARD_H
-#define BOARD_H
+#pragma once
 
-#include <string>
-#include "types.h"
 #include "bitboard.h"
-#include "pvtable.h"
 #include "movegen.h"
+#include "types.h"
+#include <string>
 
-namespace ChessCpp {
+namespace Zugzwang {
+
 class MoveGen;
+
 namespace Zobrist {
-    inline Key psq[PIECE_NB][SQUARE_NB];
-    inline Key castling[CASTLING_RIGHT_NB];
-    inline Key side;
-}  // namespace Zobrist
+
+inline Key psq[PIECE_NB][SQUARE_NB];
+inline Key castling[CASTLING_RIGHT_NB];
+inline Key side;
+
+} // namespace Zobrist
 
 struct StateInfo {
-    Move move;
+    Move Move;
 
-    Square epSquare;
-    int rule50;
-    int castlingRights;
-    Piece captured;
-    Key posKey;
+    Square EpSquare;
+    int FiftyMoveCount;
+    int CastlingRights;
+    Piece Captured;
+    Key PosKey;
 };
 
 class Board {
-  private:
-    unsigned long long perftLealNodes;
-
-    void generate_posKey();
-    void update_lists_bitboards();
-    void put_piece(Piece piece, Square sq);
-    void remove_piece(Square sq);
-    void move_piece(Square from, Square to);
-    void perft(int depth);
-
   public:
-    Piece pieces[SQUARE_NB];
-    int pieceNb[PIECE_NB];
-    Square pieceList[PIECE_NB][10];
-    Square kingSquare[COLOR_NB];
-    Color sideToMove;
-    Bitboard byColorBB[COLOR_NB];
-    int material[COLOR_NB];
+    Piece Pieces[SQUARE_NB];
+    int PieceNumber[PIECE_NB];
+    Square PieceList[PIECE_NB][10];
+    Square KingSquare[COLOR_NB];
+    Color SideToMove;
+    Bitboard ByColorBB[COLOR_NB];
 
-    int ply;
-    int gamePly;
+    int GamePly;
 
-    Square epSquare;
-    int rule50;
-    int castlingRights;
-    Key posKey;
+    Square EpSquare;
+    int FiftyMoveCount;
+    int CastlingRights;
+    Key PosKey;
 
-    StateInfo history[MAX_PLIES];
+    static void InitZobrist();
+    void Reset();
+    void ParseFen(const char* fenStr);
+    void Print() const;
+    bool IsInCheck(Color color) const;
+    bool IsRepetition() const;
 
-    PVTable pvTable;
-    Move pvArray[MAX_DEPTH];
+    bool MakeMove(const Move& move);
+    void UnmakeMove();
 
-    static void init_zobrist();
-    void reset();
-    void set(const char* fenStr);
-    void print() const;
-    bool is_in_check(Color color) const;
-    bool is_repetition() const;
+    void PerftTest(int depth);
 
-    bool do_move(const Move& move);
-    void undo_move();
+  private:
+    StateInfo m_History[MAX_PLIES];
 
-    void perftTest(int depth);
+    unsigned long long m_PerftLealNodes;
+
+    void GeneratePosKey();
+    void UpdateListsBitboards();
+    void PutPiece(Piece piece, Square sq);
+    void RemoveRiece(Square sq);
+    void MovePiece(Square from, Square to);
+    void Perft(int depth);
 };
 
-inline void Board::put_piece(Piece piece, Square sq) {
-    ASSERT(piece != NO_PIECE);
-    Color color = color_of(piece);
-
-    pieces[sq] = piece;
-    posKey ^= Zobrist::psq[piece][sq];
-    material[color] += PieceValues[type_of(piece)];
-    pieceList[piece][pieceNb[piece]++] = sq;
-    set_bit(byColorBB[color], sq);
-}
-
-inline void Board::remove_piece(Square sq) {
-    Piece piece = pieces[sq];
-
-    ASSERT(piece != NO_PIECE);
-
-    Color color = color_of(piece);
-    posKey ^= Zobrist::psq[piece][sq];
-    pieces[sq] = NO_PIECE;
-    material[color] -= PieceValues[type_of(piece)];
-
-    clear_bit(byColorBB[color], sq);
-
-    for (int i = 0; i < pieceNb[piece]; ++i) {
-        if (pieceList[piece][i] == sq) {
-            pieceList[piece][i] = pieceList[piece][--pieceNb[piece]];
-            return;
-        }
-    }
-    ASSERT(false);
-}
-
-inline void Board::move_piece(Square from, Square to) {
-    Piece piece = pieces[from];
-    ASSERT(piece != NO_PIECE);
-    Color color = color_of(piece);
-
-    posKey ^= Zobrist::psq[piece][from];
-    posKey ^= Zobrist::psq[piece][to];
-    pieces[from] = NO_PIECE;
-    pieces[to] = piece;
-    clear_bit(byColorBB[color], from);
-    set_bit(byColorBB[color], to);
-
-    for (int i = 0; i < pieceNb[piece]; ++i) {
-        if (pieceList[piece][i] == from) {
-            pieceList[piece][i] = to;
-            return;
-        }
-    }
-    ASSERT(false);
-}
-
-inline bool Board::is_in_check(Color color) const {
-    return MoveGen::is_square_attacked(*this, kingSquare[color], ~color);
-}
-}  // namespace ChessCpp
-
-#endif  // BOARD_H
+} // namespace Zugzwang
