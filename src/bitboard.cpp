@@ -187,7 +187,7 @@ constexpr Bitboard Bitboards::PawnAttacks[2][64] = {{
 }};
 // clang-format on
 
-void Bitboards::init() {
+void Bitboards::Init() {
     Bitboard blockers[4096]; // 2 ^ 12
     int numPatterns;
 

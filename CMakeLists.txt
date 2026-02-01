@@ -1,17 +1,26 @@
-cmake_minimum_required(VERSION 3.20)
-project(Zugzwang LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.10)
+project(Zugzwang)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-file(GLOB_RECURSE PROJECT_SOURCES
-     CONFIGURE_DEPENDS
-     "${CMAKE_SOURCE_DIR}/src/*.cpp"
-     "${CMAKE_SOURCE_DIR}/src/*.hpp"
-     "${CMAKE_SOURCE_DIR}/src/*.h"
+set(SOURCES
+    src/main.cpp
+    src/bitboard.cpp
+    src/board.cpp
+    src/movegen.cpp
+    src/uci.cpp
+
+    src/bitboard.h
+    src/board.h
+    src/movegen.h
+    src/uci.h
+    src/types.h
 )
 
-add_executable(Zugzwang ${PROJECT_SOURCES})
+add_executable(Zugzwang ${SOURCES})
 
-target_include_directories(Zugzwang PRIVATE "${CMAKE_SOURCE_DIR}/src")
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${SOURCES})
+
+target_include_directories(Zugzwang PRIVATE "${PROJECT_SOURCE_DIR}/src")

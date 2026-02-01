@@ -36,7 +36,17 @@ uint64_t rand64() {
 
 } // namespace
 
-void Board::InitZobrist() {
+namespace Zobrist {
+
+Key psq[PIECE_NB][SQUARE_NB]; // psq[NO_PIECE] for en passant
+Key castling[CASTLING_RIGHT_NB];
+Key side;
+
+} // namespace Zobrist
+
+Board::Board() { initZobrist(); }
+
+void Board::initZobrist() {
     for (int i = 0; i < PIECE_NB; ++i) {
         for (Square j = SQ_A1; j < SQUARE_NB; ++j) {
             Zobrist::psq[i][j] = rand64();
@@ -48,7 +58,7 @@ void Board::InitZobrist() {
     }
 }
 
-void Board::PutPiece(Piece piece, Square sq) {
+void Board::putPiece(Piece piece, Square sq) {
     ASSERT(piece != NO_PIECE);
     Color color = ColorOf(piece);
 
@@ -58,7 +68,7 @@ void Board::PutPiece(Piece piece, Square sq) {
     SetBit(byColorBB[color], sq);
 }
 
-void Board::RemovePiece(Square sq) {
+void Board::removePiece(Square sq) {
     Piece piece = pieces[sq];
     ASSERT(piece != NO_PIECE);
 
@@ -78,7 +88,7 @@ void Board::RemovePiece(Square sq) {
     ASSERT(false);
 }
 
-void Board::MovePiece(Square from, Square to) {
+void Board::movePiece(Square from, Square to) {
     Piece piece = pieces[from];
     ASSERT(piece != NO_PIECE);
 
@@ -101,7 +111,7 @@ void Board::MovePiece(Square from, Square to) {
     ASSERT(false);
 }
 
-void Board::GeneratePosKey() {
+void Board::generatePosKey() {
     for (Square i = SQ_A1; i < SQUARE_NB; ++i) {
         Piece piece = pieces[i];
         if (piece != NO_PIECE) {
@@ -120,7 +130,7 @@ void Board::GeneratePosKey() {
     posKey ^= Zobrist::castling[castlingRights];
 }
 
-void Board::Reset() {
+void Board::reset() {
     for (Square i = SQ_A1; i < SQUARE_NB; ++i) {
         pieces[i] = NO_PIECE;
     }
@@ -139,7 +149,7 @@ void Board::Reset() {
     posKey = 0ULL;
 }
 
-void Board::UpdateListsBitboards() {
+void Board::updateListsBitboards() {
     for (Square sq = SQ_A1; sq < SQUARE_NB; ++sq) {
         const Piece piece = pieces[sq];
 
@@ -152,13 +162,13 @@ void Board::UpdateListsBitboards() {
     }
 }
 
-void Board::ParseFen(const char* fenStr) {
-    Reset();
+void Board::ParseFen(const std::string& fen) {
+    reset();
 
     unsigned char col, row, token;
     size_t idx;
     Square sq = SQ_A8;
-    std::istringstream ss(fenStr);
+    std::istringstream ss(fen);
 
     ss >> std::noskipws;
 
@@ -211,8 +221,8 @@ void Board::ParseFen(const char* fenStr) {
     // Convert from fullmove starting from 1 to internal ply count
     gamePly = std::max(2 * (gamePly - 1), 0) + (sideToMove == BLACK);
 
-    GeneratePosKey();
-    UpdateListsBitboards();
+    generatePosKey();
+    updateListsBitboards();
 }
 
 bool Board::MakeMove(const Move& move) {
@@ -235,21 +245,21 @@ bool Board::MakeMove(const Move& move) {
     // special move handling
     if (move.TypeOf() == EN_PASSANT) {
         // remove the captured pawn (behind 'to')
-        RemovePiece(to + (sideToMove == WHITE ? SOUTH : NORTH));
+        removePiece(to + (sideToMove == WHITE ? SOUTH : NORTH));
         rule50 = 0; // reset 50-move on capture
     } else if (move.TypeOf() == CASTLING) {
         switch (to) {
-            case SQ_C1: MovePiece(SQ_A1, SQ_D1); break;
-            case SQ_C8: MovePiece(SQ_A8, SQ_D8); break;
-            case SQ_G1: MovePiece(SQ_H1, SQ_F1); break;
-            case SQ_G8: MovePiece(SQ_H8, SQ_F8); break;
+            case SQ_C1: movePiece(SQ_A1, SQ_D1); break;
+            case SQ_C8: movePiece(SQ_A8, SQ_D8); break;
+            case SQ_G1: movePiece(SQ_H1, SQ_F1); break;
+            case SQ_G8: movePiece(SQ_H8, SQ_F8); break;
             default: ASSERT(false);
         }
     }
 
     // normal capture handling (if a piece sits on 'to')
     if (pieces[to] != NO_PIECE) {
-        RemovePiece(to);
+        removePiece(to);
         rule50 = 0;
     } else if (move.TypeOf() != EN_PASSANT) {
         // only increment rule50 if it wasn't a capture (en-passant already set to 0)
@@ -257,12 +267,12 @@ bool Board::MakeMove(const Move& move) {
     }
 
     // move the piece
-    MovePiece(from, to);
+    movePiece(from, to);
 
     // promotion handling
     if (move.TypeOf() == PROMOTION) {
-        RemovePiece(to);
-        PutPiece(MakePiece(sideToMove, move.PromotionType()), to);
+        removePiece(to);
+        putPiece(MakePiece(sideToMove, move.PromotionType()), to);
     }
 
     // update king square (if moved)
@@ -304,28 +314,28 @@ void Board::UnmakeMove(const Move& move) {
     const Square to = move.ToSq();
 
     if (move.TypeOf() == EN_PASSANT) {
-        PutPiece(MakePiece(sideToMove, PAWN), to + PawnPush(sideToMove));
+        putPiece(MakePiece(sideToMove, PAWN), to + PawnPush(sideToMove));
     } else if (move.TypeOf() == CASTLING) {
         switch (to) {
-            case SQ_C1: MovePiece(SQ_D1, SQ_A1); break;
-            case SQ_C8: MovePiece(SQ_D8, SQ_A8); break;
-            case SQ_G1: MovePiece(SQ_F1, SQ_H1); break;
-            case SQ_G8: MovePiece(SQ_F8, SQ_H8); break;
+            case SQ_C1: movePiece(SQ_D1, SQ_A1); break;
+            case SQ_C8: movePiece(SQ_D8, SQ_A8); break;
+            case SQ_G1: movePiece(SQ_F1, SQ_H1); break;
+            case SQ_G8: movePiece(SQ_F8, SQ_H8); break;
             default: ASSERT(false);
         }
     }
 
     sideToMove = ~sideToMove;
 
-    MovePiece(to, from);
+    movePiece(to, from);
 
     if (move.TypeOf() == PROMOTION) {
-        RemovePiece(from);
-        PutPiece(MakePiece(sideToMove, PAWN), from);
+        removePiece(from);
+        putPiece(MakePiece(sideToMove, PAWN), from);
     }
 
     if (history[gamePly].captured != NO_PIECE) {
-        PutPiece(history[gamePly].captured, to);
+        putPiece(history[gamePly].captured, to);
     }
 
     if (TypeOf(pieces[from]) == KING) {
@@ -368,7 +378,7 @@ void Board::Print() const {
     cout << "Position key: " << posKey << "\n";
 }
 
-void Board::Perft(int depth) {
+void Board::perft(int depth) {
     if (depth == 0) {
         perftLealNodes++;
         return;
@@ -380,7 +390,7 @@ void Board::Perft(int depth) {
         if (!MakeMove(move)) {
             continue;
         }
-        Perft(depth - 1);
+        perft(depth - 1);
         UnmakeMove(move);
     }
 }
@@ -403,15 +413,15 @@ uint64_t Board::PerftTest(int depth) {
 
         uint64_t before = perftLealNodes;
 
-        Perft(depth - 1);
+        perft(depth - 1);
         UnmakeMove(move);
-        std::cout << move << ": " << perftLealNodes - before << std::endl;
+        std::cout << move << ": " << perftLealNodes - before << "\n";
     }
 
     const auto stop = high_resolution_clock::now();
     const auto duration = duration_cast<milliseconds>(stop - start).count();
 
-    std::cout << "Total: " << perftLealNodes << " nodes in " << duration << " ms" << std::endl;
+    std::cout << "Total: " << perftLealNodes << " nodes in " << duration << " ms\n\n";
 
     return duration;
 }

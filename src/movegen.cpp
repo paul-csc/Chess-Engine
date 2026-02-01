@@ -6,7 +6,7 @@
 namespace Zugzwang {
 namespace {
 
-void generate_sliding_moves(const Board& board, MoveList& list) {
+void GenerateSlidingMoves(const Board& board, MoveList& list) {
     const Color side = board.sideToMove;
     const Bitboard occupancy = board.byColorBB[WHITE] | board.byColorBB[BLACK];
 
@@ -39,59 +39,7 @@ void generate_sliding_moves(const Board& board, MoveList& list) {
     }
 }
 
-void generate_king_moves(const Board& board, MoveList& list) {
-    const Color color = board.sideToMove;
-    Square startSq = board.kingSquare[color];
-
-    Bitboard attacks = Bitboards::GetAttacks<KING>(startSq) & ~board.byColorBB[color];
-    while (attacks) {
-        Square targetSq = PopLsb(attacks);
-        list.Insert(Move(startSq, targetSq));
-    }
-
-    // castling
-    if (color == WHITE) {
-        if (board.castlingRights & WHITE_OO) {
-            if (board.pieces[SQ_F1] == NO_PIECE && board.pieces[SQ_G1] == NO_PIECE) {
-                if (!MoveGen::IsSquareAttacked(board, SQ_E1, BLACK) &&
-                    !MoveGen::IsSquareAttacked(board, SQ_F1, BLACK)) {
-                    list.Insert(Move::Make<CASTLING>(SQ_E1, SQ_G1));
-                }
-            }
-        }
-
-        if (board.castlingRights & WHITE_OOO) {
-            if (board.pieces[SQ_D1] == NO_PIECE && board.pieces[SQ_C1] == NO_PIECE &&
-                board.pieces[SQ_B1] == NO_PIECE) {
-                if (!MoveGen::IsSquareAttacked(board, SQ_E1, BLACK) &&
-                    !MoveGen::IsSquareAttacked(board, SQ_D1, BLACK)) {
-                    list.Insert(Move::Make<CASTLING>(SQ_E1, SQ_C1));
-                }
-            }
-        }
-    } else {
-        if (board.castlingRights & BLACK_OO) {
-            if (board.pieces[SQ_F8] == NO_PIECE && board.pieces[SQ_G8] == NO_PIECE) {
-                if (!MoveGen::IsSquareAttacked(board, SQ_E8, WHITE) &&
-                    !MoveGen::IsSquareAttacked(board, SQ_F8, WHITE)) {
-                    list.Insert(Move::Make<CASTLING>(SQ_E8, SQ_G8));
-                }
-            }
-        }
-
-        if (board.castlingRights & BLACK_OOO) {
-            if (board.pieces[SQ_D8] == NO_PIECE && board.pieces[SQ_C8] == NO_PIECE &&
-                board.pieces[SQ_B8] == NO_PIECE) {
-                if (!MoveGen::IsSquareAttacked(board, SQ_E8, WHITE) &&
-                    !MoveGen::IsSquareAttacked(board, SQ_D8, WHITE)) {
-                    list.Insert(Move::Make<CASTLING>(SQ_E8, SQ_C8));
-                }
-            }
-        }
-    }
-}
-
-void generate_knight_moves(const Board& board, MoveList& list) {
+void GenerateKnightMoves(const Board& board, MoveList& list) {
     const Color color = board.sideToMove;
     const Piece piece = MakePiece(color, KNIGHT);
     const int pieceNb = board.pieceNb[piece];
@@ -107,7 +55,7 @@ void generate_knight_moves(const Board& board, MoveList& list) {
     }
 }
 
-void generate_pawn_moves(const Board& board, MoveList& list) {
+void GeneratePawnMoves(const Board& board, MoveList& list) {
     const Color color = board.sideToMove;
     const Piece pawn = MakePiece(color, PAWN);
     const int pieceNb = board.pieceNb[pawn];
@@ -164,6 +112,58 @@ void generate_pawn_moves(const Board& board, MoveList& list) {
     }
 }
 
+void GenerateKingMoves(const Board& board, MoveList& list) {
+    const Color color = board.sideToMove;
+    Square startSq = board.kingSquare[color];
+
+    Bitboard attacks = Bitboards::GetAttacks<KING>(startSq) & ~board.byColorBB[color];
+    while (attacks) {
+        Square targetSq = PopLsb(attacks);
+        list.Insert(Move(startSq, targetSq));
+    }
+
+    // castling
+    if (color == WHITE) {
+        if (board.castlingRights & WHITE_OO) {
+            if (board.pieces[SQ_F1] == NO_PIECE && board.pieces[SQ_G1] == NO_PIECE) {
+                if (!MoveGen::IsSquareAttacked(board, SQ_E1, BLACK) &&
+                    !MoveGen::IsSquareAttacked(board, SQ_F1, BLACK)) {
+                    list.Insert(Move::Make<CASTLING>(SQ_E1, SQ_G1));
+                }
+            }
+        }
+
+        if (board.castlingRights & WHITE_OOO) {
+            if (board.pieces[SQ_D1] == NO_PIECE && board.pieces[SQ_C1] == NO_PIECE &&
+                board.pieces[SQ_B1] == NO_PIECE) {
+                if (!MoveGen::IsSquareAttacked(board, SQ_E1, BLACK) &&
+                    !MoveGen::IsSquareAttacked(board, SQ_D1, BLACK)) {
+                    list.Insert(Move::Make<CASTLING>(SQ_E1, SQ_C1));
+                }
+            }
+        }
+    } else {
+        if (board.castlingRights & BLACK_OO) {
+            if (board.pieces[SQ_F8] == NO_PIECE && board.pieces[SQ_G8] == NO_PIECE) {
+                if (!MoveGen::IsSquareAttacked(board, SQ_E8, WHITE) &&
+                    !MoveGen::IsSquareAttacked(board, SQ_F8, WHITE)) {
+                    list.Insert(Move::Make<CASTLING>(SQ_E8, SQ_G8));
+                }
+            }
+        }
+
+        if (board.castlingRights & BLACK_OOO) {
+            if (board.pieces[SQ_D8] == NO_PIECE && board.pieces[SQ_C8] == NO_PIECE &&
+                board.pieces[SQ_B8] == NO_PIECE) {
+                if (!MoveGen::IsSquareAttacked(board, SQ_E8, WHITE) &&
+                    !MoveGen::IsSquareAttacked(board, SQ_D8, WHITE)) {
+                    list.Insert(Move::Make<CASTLING>(SQ_E8, SQ_C8));
+                }
+            }
+        }
+    }
+}
+
 } // namespace
 
 namespace MoveGen {
@@ -216,12 +216,11 @@ bool IsSquareAttacked(const Board& board, Square sq, Color attacker) {
 }
 
 void GeneratePseudoMoves(const Board& board, MoveList& list) {
-    generate_pawn_moves(board, list);
-    generate_sliding_moves(board, list);
-    generate_knight_moves(board, list);
-    generate_king_moves(board, list);
+    GenerateSlidingMoves(board, list);
+    GenerateKnightMoves(board, list);
+    GeneratePawnMoves(board, list);
+    GenerateKingMoves(board, list);
 }
 
 } // namespace MoveGen
-
 } // namespace Zugzwang

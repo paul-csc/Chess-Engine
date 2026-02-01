@@ -9,7 +9,7 @@ class Bitboards {
   public:
     Bitboards() = delete;
 
-    static void init();
+    static void Init();
 
     template <PieceType P>
     static Bitboard GetAttacks(Square square, Bitboard occupancy = 0, Color color = WHITE) {
