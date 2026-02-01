@@ -7,11 +7,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 file(GLOB_RECURSE PROJECT_SOURCES
      CONFIGURE_DEPENDS
-     "${CMAKE_SOURCE_DIR}/src/*.cpp"
-     "${CMAKE_SOURCE_DIR}/src/*.hpp"
-     "${CMAKE_SOURCE_DIR}/src/*.h"
+     "${PROJECT_SOURCE_DIR}/src/*.cpp"
+     "${PROJECT_SOURCE_DIR}/src/*.hpp"
+     "${PROJECT_SOURCE_DIR}/src/*.h"
 )
 
 add_executable(Zugzwang ${PROJECT_SOURCES})
 
-target_include_directories(Zugzwang PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_include_directories(Zugzwang PRIVATE "${PROJECT_SOURCE_DIR}/src")

@@ -36,6 +36,8 @@ uint64_t rand64() {
 
 } // namespace
 
+Board::Board() { InitZobrist(); }
+
 void Board::InitZobrist() {
     for (int i = 0; i < PIECE_NB; ++i) {
         for (Square j = SQ_A1; j < SQUARE_NB; ++j) {
@@ -152,13 +154,13 @@ void Board::UpdateListsBitboards() {
     }
 }
 
-void Board::ParseFen(const char* fenStr) {
+void Board::ParseFen(const std::string& fen) {
     Reset();
 
     unsigned char col, row, token;
     size_t idx;
     Square sq = SQ_A8;
-    std::istringstream ss(fenStr);
+    std::istringstream ss(fen);
 
     ss >> std::noskipws;
 
@@ -405,13 +407,13 @@ uint64_t Board::PerftTest(int depth) {
 
         Perft(depth - 1);
         UnmakeMove(move);
-        std::cout << move << ": " << perftLealNodes - before << std::endl;
+        std::cout << move << ": " << perftLealNodes - before << "\n";
     }
 
     const auto stop = high_resolution_clock::now();
     const auto duration = duration_cast<milliseconds>(stop - start).count();
 
-    std::cout << "Total: " << perftLealNodes << " nodes in " << duration << " ms" << std::endl;
+    std::cout << "Total: " << perftLealNodes << " nodes in " << duration << " ms\n\n";
 
     return duration;
 }

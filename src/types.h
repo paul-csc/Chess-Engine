@@ -12,7 +12,6 @@ namespace Zugzwang {
 using Bitboard = uint64_t;
 using Key = uint64_t;
 
-constexpr auto START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 constexpr int MAX_MOVES = 256;
 constexpr int MAX_PLIES = 2048;
 

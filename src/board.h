@@ -2,7 +2,6 @@
 
 #include "bitboard.h"
 #include "types.h"
-#include <array>
 
 namespace Zugzwang {
 namespace Zobrist {
@@ -23,7 +22,18 @@ struct StateInfo {
 
 class Board {
   public:
-    std::array<Piece, SQUARE_NB> pieces;
+    Board();
+
+    void ParseFen(const std::string& fen);
+
+    bool MakeMove(const Move& move);
+    void UnmakeMove(const Move& move);
+
+    void Print() const;
+
+    uint64_t PerftTest(int depth);
+
+    Piece pieces[SQUARE_NB];
     int pieceNb[PIECE_NB];
     Square pieceList[PIECE_NB][10];
     Square kingSquare[COLOR_NB];
@@ -36,22 +46,7 @@ class Board {
     int castlingRights;
     Key posKey;
 
-    Board() { InitZobrist(); }
-
-    void ParseFen(const char* fenStr);
-
-    bool MakeMove(const Move& move);
-    void UnmakeMove(const Move& move);
-
-    void Print() const;
-
-    uint64_t PerftTest(int depth);
-
   private:
-    uint64_t perftLealNodes;
-
-    StateInfo history[MAX_PLIES];
-
     void InitZobrist();
 
     void PutPiece(Piece piece, Square sq);
@@ -62,6 +57,10 @@ class Board {
     void Reset();
     void UpdateListsBitboards();
     void Perft(int depth);
+
+    uint64_t perftLealNodes;
+
+    StateInfo history[MAX_PLIES];
 };
 
 } // namespace Zugzwang
